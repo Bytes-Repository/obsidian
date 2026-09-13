@@ -1,0 +1,68 @@
+mod context
+mod module
+mod types
+mod values
+mod function
+mod builder
+mod execution_engine
+
+fn build_sum_module(ctx: Context) -> Module is
+    let m: Module = ctx.create_module("hello_sum")
+
+    let i32_ty: Type = ctx.i32_type()
+    let fn_ty: Type = i32_ty.fn_type([i32_ty, i32_ty], false)
+    let sum_fn: FunctionValue = m.add_function("sum", fn_ty)
+
+    let entry: BasicBlock = sum_fn.append_basic_block(ctx, "entry")
+    let b: Builder = ctx.create_builder()
+    b.position_at_end(entry)
+
+    let a: Value = sum_fn.get_param(0)
+    let bb: Value = sum_fn.get_param(1)
+    let result: Value = b.build_add(a, bb, "result")
+    b.build_ret(result)
+    b.dispose()
+
+    return m
+end
+
+fn main() is
+    let ctx: Context = Context::create()
+    let m: Module = build_sum_module(ctx)
+
+    write("=== LLVM IR ===")
+    write(m.print_to_string())
+
+    if m.is_valid() is
+        write("=== Moduł poprawny ===")
+    else
+        write("=== BŁĄD WERYFIKACJI ===")
+        write(m.verify())
+        return
+    end
+
+    ;; JIT: uruchamiamy sum(2, 40) reflektywnie przez interpreter LLVM-a —
+    ;; patrz komentarz na górze src/execution_engine.h# po wyjaśnienie
+    ;; dlaczego akurat tak (a nie "prawdziwym" wskaźnikiem funkcyjnym).
+    ExecutionEngine::link_in_mcjit()
+    let ee = ExecutionEngine::create_for_module(m)
+    if ee == nil is
+        write("Nie udało się utworzyć ExecutionEngine: " + obsidian_last_error())
+        return
+    end
+
+    let sum_fn: FunctionValue = m.get_function("sum")
+    let i32_ty: Type = ctx.i32_type()
+    let arg_a: GenericValue = GenericValue::of_int(i32_ty, 2, true)
+    let arg_b: GenericValue = GenericValue::of_int(i32_ty, 40, true)
+    let result: GenericValue = ee.run_function(sum_fn, [arg_a, arg_b])
+
+    write("=== Wynik JIT ===")
+    write("sum(2, 40) = " + to_string(result.to_int_signed()))
+
+    result.dispose()
+    arg_a.dispose()
+    arg_b.dispose()
+    ee.dispose() ;; zwalnia też `m` — moduł jest już własnością silnika
+    ctx.dispose()
+end
