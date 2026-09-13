@@ -1,0 +1,54 @@
+pub fn types_to_handles(items: [Type]) -> [int] is
+    let mut out: [int] = []
+    let mut i: int = 0
+    while i < items.len() is
+        let item: Type = items[i]
+        out.push(item.handle)
+        i = i + 1
+    end
+    return out
+end
+
+pub fn values_to_handles(items: [Value]) -> [int] is
+    let mut out: [int] = []
+    let mut i: int = 0
+    while i < items.len() is
+        let item: Value = items[i]
+        out.push(item.handle)
+        i = i + 1
+    end
+    return out
+end
+
+pub fn blocks_to_handles(items: [BasicBlock]) -> [int] is
+    let mut out: [int] = []
+    let mut i: int = 0
+    while i < items.len() is
+        let item: BasicBlock = items[i]
+        out.push(item.handle)
+        i = i + 1
+    end
+    return out
+end
+
+pub fn handles_to_types(items: [int]) -> [Type] is
+    let mut out: [Type] = []
+    let mut i: int = 0
+    while i < items.len() is
+        let h: int = items[i]
+        out.push(Type { handle: h })
+        i = i + 1
+    end
+    return out
+end
+
+pub fn handles_to_values(items: [int]) -> [Value] is
+    let mut out: [Value] = []
+    let mut i: int = 0
+    while i < items.len() is
+        let h: int = items[i]
+        out.push(Value { handle: h })
+        i = i + 1
+    end
+    return out
+end
