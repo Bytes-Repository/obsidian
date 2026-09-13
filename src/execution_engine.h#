@@ -1,0 +1,109 @@
+mod ffi
+mod conv
+
+struct ExecutionEngine is
+    pub handle: int
+end
+
+struct GenericValue is
+    pub handle: int
+end
+
+impl ExecutionEngine is
+    ;; MCJIT (prawdziwy JIT, generuje kod maszynowy) NIE jest wlinkowany
+    ;; domyślnie — wołaj raz na starcie procesu, przed pierwszym
+    ;; `create_jit_compiler`/`create_execution_engine`.
+    fn link_in_mcjit() is
+        LLVMLinkInMCJIT()
+    end
+    ;; Interpreter czysto programowy (bez JIT-a) — wolniejszy, ale nie
+    ;; wymaga backendu maszynowego dla architektury hosta. Rzadko
+    ;; potrzebny jeśli `Target::init_native()` już działa.
+    fn link_in_interpreter() is
+        LLVMLinkInInterpreter()
+    end
+
+    ;; Przejmuje WŁASNOŚĆ `m` — nie wołaj `m.dispose()` po sukcesie, silnik
+    ;; zwolni moduł sam w `dispose()`. Zwraca `nil` przy błędzie (patrz
+    ;; `obsidian::last_error()`) — zwykle brak `link_in_mcjit()`/
+    ;; `Target::init_native()` wcześniej, albo moduł nie przeszedł
+    ;; weryfikacji.
+    fn create_for_module(m: Module) -> ExecutionEngine? is
+        let h: int = obsidian_create_execution_engine_for_module(m.handle)
+        if h == 0 is return nil end
+        return ExecutionEngine { handle: h }
+    end
+
+    fn create_jit_compiler(m: Module, opt_level: i32) -> ExecutionEngine? is
+        let h: int = obsidian_create_jit_compiler_for_module(m.handle, opt_level)
+        if h == 0 is return nil end
+        return ExecutionEngine { handle: h }
+    end
+
+    fn create_interpreter(m: Module) -> ExecutionEngine? is
+        let h: int = obsidian_create_interpreter_for_module(m.handle)
+        if h == 0 is return nil end
+        return ExecutionEngine { handle: h }
+    end
+
+    fn dispose(self) is
+        LLVMDisposeExecutionEngine(self.handle)
+    end
+
+    fn add_module(self, m: Module) is
+        LLVMAddModule(self.handle, m.handle)
+    end
+
+    ;; Adres funkcji w pamięci procesu (po skompilowaniu przez JIT) —
+    ;; przydatny do przekazania własnemu mostkowi C o znanej sygnaturze,
+    ;; patrz komentarz na górze pliku. `0` jeśli funkcja nie istnieje w
+    ;; żadnym module dodanym do tego silnika.
+    fn function_address(self, name: string) -> int is
+        return LLVMGetFunctionAddress(self.handle, name)
+    end
+
+    ;; Wywołuje `fn_val` reflektywnie przez interpreter LLVM-a (patrz
+    ;; komentarz na górze pliku) i zwraca `GenericValue` z wynikiem — musisz
+    ;; sam wiedzieć, jak go odczytać (`to_int`/`to_float`/`to_pointer`)
+    ;; zgodnie z typem zwrotnym `fn_val`. Nie woł na funkcji zwracającej
+    ;; `void`.
+    fn run_function(self, fn_val: FunctionValue, args: [GenericValue]) -> GenericValue is
+        let mut handles: [int] = []
+        let mut i: int = 0
+        while i < args.len() is
+            let arg: GenericValue = args[i]
+            handles.push(arg.handle)
+            i = i + 1
+        end
+        return GenericValue { handle: obsidian_run_function(self.handle, fn_val.handle, handles) }
+    end
+end
+
+impl GenericValue is
+    fn of_int(ty: Type, val: int, is_signed: bool) -> GenericValue is
+        return GenericValue { handle: LLVMCreateGenericValueOfInt(ty.handle, val, if is_signed then 1 else 0) }
+    end
+    fn of_float(ty: Type, val: f64) -> GenericValue is
+        return GenericValue { handle: LLVMCreateGenericValueOfFloat(ty.handle, val) }
+    end
+    fn of_pointer(addr: int) -> GenericValue is
+        return GenericValue { handle: LLVMCreateGenericValueOfPointer(addr) }
+    end
+
+    fn to_int_signed(self) -> int is
+        return LLVMGenericValueToInt(self.handle, 1)
+    end
+    fn to_int_unsigned(self) -> int is
+        return LLVMGenericValueToInt(self.handle, 0)
+    end
+    fn to_float(self, ty: Type) -> f64 is
+        return LLVMGenericValueToFloat(ty.handle, self.handle)
+    end
+    fn to_pointer(self) -> int is
+        return LLVMGenericValueToPointer(self.handle)
+    end
+
+    fn dispose(self) is
+        LLVMDisposeGenericValue(self.handle)
+    end
+end
