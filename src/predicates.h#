@@ -1,0 +1,89 @@
+pub const INT_EQ:  i32 = 32   ;; ==
+pub const INT_NE:  i32 = 33   ;; !=
+pub const INT_UGT: i32 = 34   ;; > (unsigned)
+pub const INT_UGE: i32 = 35   ;; >= (unsigned)
+pub const INT_ULT: i32 = 36   ;; < (unsigned)
+pub const INT_ULE: i32 = 37   ;; <= (unsigned)
+pub const INT_SGT: i32 = 38   ;; > (signed)
+pub const INT_SGE: i32 = 39   ;; >= (signed)
+pub const INT_SLT: i32 = 40   ;; < (signed)
+pub const INT_SLE: i32 = 41   ;; <= (signed)
+
+;; ── LLVMRealPredicate (dla Builder::fcmp) ───────────────────────────────
+pub const REAL_PREDICATE_FALSE: i32 = 0
+pub const REAL_OEQ: i32 = 1
+pub const REAL_OGT: i32 = 2
+pub const REAL_OGE: i32 = 3
+pub const REAL_OLT: i32 = 4
+pub const REAL_OLE: i32 = 5
+pub const REAL_ONE: i32 = 6
+pub const REAL_ORD: i32 = 7
+pub const REAL_UNO: i32 = 8
+pub const REAL_UEQ: i32 = 9
+pub const REAL_UGT: i32 = 10
+pub const REAL_UGE: i32 = 11
+pub const REAL_ULT: i32 = 12
+pub const REAL_ULE: i32 = 13
+pub const REAL_UNE: i32 = 14
+pub const REAL_PREDICATE_TRUE: i32 = 15
+
+;; ── LLVMLinkage ──────────────────────────────────────────────────────────
+pub const LINKAGE_EXTERNAL:              i32 = 0
+pub const LINKAGE_AVAILABLE_EXTERNALLY:  i32 = 1
+pub const LINKAGE_LINK_ONCE_ANY:         i32 = 2
+pub const LINKAGE_LINK_ONCE_ODR:         i32 = 3
+pub const LINKAGE_WEAK_ANY:              i32 = 4
+pub const LINKAGE_WEAK_ODR:              i32 = 5
+pub const LINKAGE_APPENDING:             i32 = 6
+pub const LINKAGE_INTERNAL:              i32 = 7
+pub const LINKAGE_PRIVATE:               i32 = 8
+pub const LINKAGE_EXTERNAL_WEAK:         i32 = 11
+pub const LINKAGE_COMMON:                i32 = 13
+
+;; ── LLVMVisibility ───────────────────────────────────────────────────────
+pub const VISIBILITY_DEFAULT:   i32 = 0
+pub const VISIBILITY_HIDDEN:    i32 = 1
+pub const VISIBILITY_PROTECTED: i32 = 2
+
+;; ── LLVMTypeKind ─────────────────────────────────────────────────────────
+pub const TYPE_KIND_VOID:    i32 = 0
+pub const TYPE_KIND_HALF:    i32 = 1
+pub const TYPE_KIND_FLOAT:   i32 = 2
+pub const TYPE_KIND_DOUBLE:  i32 = 3
+pub const TYPE_KIND_LABEL:   i32 = 7
+pub const TYPE_KIND_INTEGER: i32 = 8
+pub const TYPE_KIND_FUNCTION: i32 = 9
+pub const TYPE_KIND_STRUCT:  i32 = 10
+pub const TYPE_KIND_ARRAY:   i32 = 11
+pub const TYPE_KIND_POINTER: i32 = 12
+pub const TYPE_KIND_VECTOR:  i32 = 13
+
+;; ── LLVMCallConv (najczęściej używane) ──────────────────────────────────
+pub const CALLCONV_C:      u32 = 0
+pub const CALLCONV_FAST:   u32 = 8
+pub const CALLCONV_COLD:   u32 = 9
+
+;; ── LLVMCodeGenOptLevel ──────────────────────────────────────────────────
+pub const OPT_NONE:       i32 = 0
+pub const OPT_LESS:       i32 = 1
+pub const OPT_DEFAULT:    i32 = 2
+pub const OPT_AGGRESSIVE: i32 = 3
+
+;; ── LLVMRelocMode ────────────────────────────────────────────────────────
+pub const RELOC_DEFAULT:        i32 = 0
+pub const RELOC_STATIC:         i32 = 1
+pub const RELOC_PIC:            i32 = 2
+pub const RELOC_DYNAMIC_NO_PIC: i32 = 3
+
+;; ── LLVMCodeModel ────────────────────────────────────────────────────────
+pub const CODE_MODEL_DEFAULT:     i32 = 0
+pub const CODE_MODEL_JIT_DEFAULT: i32 = 1
+pub const CODE_MODEL_TINY:        i32 = 2
+pub const CODE_MODEL_SMALL:       i32 = 3
+pub const CODE_MODEL_KERNEL:      i32 = 4
+pub const CODE_MODEL_MEDIUM:      i32 = 5
+pub const CODE_MODEL_LARGE:       i32 = 6
+
+;; ── LLVMCodeGenFileType (patrz obsidian_target_machine_emit_to_file) ────
+pub const FILE_TYPE_ASSEMBLY: i32 = 0
+pub const FILE_TYPE_OBJECT:   i32 = 1
