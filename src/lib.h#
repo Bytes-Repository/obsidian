@@ -1,1 +1,30 @@
+mod ffi   ;; surowe bindingi LLVM-C + shim (ffi/mod.h#)
+mod conv  ;; [Type]/[Value]/[BasicBlock] <-> [int]
 
+mod predicates  ;; IntPredicate/RealPredicate/Linkage/TypeKind/...
+mod context  ;; Context
+mod module ;; Module
+mod types ;; Type
+mod values ;; Value
+mod basic_block ;; BasicBlock
+mod function ;; FunctionValue
+mod builder ;; Builder (instrukcje IR)
+mod target_machine ;; Target / TargetMachine / TargetData
+mod execution_engine ;; ExecutionEngine (MCJIT/interpreter) / GenericValue
+mod pass_manager ;; PassOptions + run_passes/optimize
+
+pub const VERSION: string = "0.1.0"
+;; Wersja LLVM, pod którą zbudowana jest TA wersja Obsidian — kolejne
+;; wersje LLVM dostają kolejne wersje Obsidian (0.2.x -> LLVM 22, ...),
+;; zawsze z identycznym API wysokopoziomowym (Context/Module/Builder/...).
+;; Patrz README.md, sekcja "Wersjonowanie".
+pub const TARGET_LLVM_VERSION: string = "21"
+
+;; Ostatni komunikat błędu z funkcji "kombinowanych" (Target::from_triple,
+;; ExecutionEngine::create_*, TargetMachine::emit_to_file, Module::verify
+;; przez `is_valid`/`verify`, ...) — te funkcje już zwracają błąd wprost
+;; (przez `nil`/string), więc zwykle NIE musisz tego wołać. Przydaje się
+;; głównie do logowania/debugowania.
+pub fn last_error() -> string is
+    return obsidian_last_error()
+end
