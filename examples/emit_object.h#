@@ -1,0 +1,59 @@
+mod context
+mod module
+mod types
+mod function
+mod builder
+mod target_machine
+mod predicates
+
+fn main() is
+    let ctx: Context = Context::create()
+    let m: Module = ctx.create_module("emit_object_demo")
+
+    let i32_ty: Type = ctx.i32_type()
+    let fn_ty: Type = i32_ty.fn_type([], false)
+    let answer_fn: FunctionValue = m.add_function("answer", fn_ty)
+
+    let entry: BasicBlock = answer_fn.append_basic_block(ctx, "entry")
+    let b: Builder = ctx.create_builder()
+    b.position_at_end(entry)
+    b.build_ret(ctx.const_int(i32_ty, 42, false))
+    b.dispose()
+
+    if !m.is_valid() is
+        write("BŁĄD WERYFIKACJI: " + m.verify())
+        return
+    end
+
+    if !Target::init_native() is
+        write("Nie udało się zainicjalizować backendu natywnego: " + obsidian_last_error())
+        return
+    end
+
+    let triple: string = Target::default_triple()
+    let target = Target::from_triple(triple)
+    if target == nil is
+        write("Nieznany triplet '" + triple + "': " + obsidian_last_error())
+        return
+    end
+
+    let tm: TargetMachine = target.create_target_machine(
+        triple,
+        Target::host_cpu_name(),
+        Target::host_cpu_features(),
+        OPT_DEFAULT,
+        RELOC_PIC,
+        CODE_MODEL_DEFAULT
+    )
+    tm.set_module_data_layout(m)
+
+    let err: string = tm.emit_to_file(m, "answer.o", FILE_TYPE_OBJECT)
+    if err == "" is
+        write("Zapisano answer.o dla '" + triple + "'")
+    else
+        write("Błąd emisji: " + err)
+    end
+
+    tm.dispose()
+    ctx.dispose()
+end
