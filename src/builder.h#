@@ -1,0 +1,266 @@
+mod ffi
+mod conv
+
+struct Builder is
+    pub handle: int
+end
+
+impl Builder is
+    fn dispose(self) is
+        LLVMDisposeBuilder(self.handle)
+    end
+
+    fn position_at_end(self, bb: BasicBlock) is
+        LLVMPositionBuilderAtEnd(self.handle, bb.handle)
+    end
+    fn position_before(self, instr: Value) is
+        LLVMPositionBuilderBefore(self.handle, instr.handle)
+    end
+    fn current_block(self) -> BasicBlock? is
+        let h: int = LLVMGetInsertBlock(self.handle)
+        if h == 0 is return nil end
+        return BasicBlock { handle: h }
+    end
+    fn clear_position(self) is
+        LLVMClearInsertionPosition(self.handle)
+    end
+
+    ;; ── Terminatory ──────────────────────────────────────────────────
+    fn build_ret(self, val: Value) -> Value is
+        return Value { handle: LLVMBuildRet(self.handle, val.handle) }
+    end
+    fn build_ret_void(self) -> Value is
+        return Value { handle: LLVMBuildRetVoid(self.handle) }
+    end
+    fn build_br(self, dest: BasicBlock) -> Value is
+        return Value { handle: LLVMBuildBr(self.handle, dest.handle) }
+    end
+    fn build_cond_br(self, cond: Value, then_bb: BasicBlock, else_bb: BasicBlock) -> Value is
+        return Value { handle: LLVMBuildCondBr(self.handle, cond.handle, then_bb.handle, else_bb.handle) }
+    end
+    fn build_unreachable(self) -> Value is
+        return Value { handle: LLVMBuildUnreachable(self.handle) }
+    end
+
+    ;; `num_cases_hint` to tylko wskazówka wydajnościowa dla LLVM-a
+    ;; (rezerwacja pojemności) — dodawaj gałęzie przez `add_case` na
+    ;; zwróconej wartości, tyle ile potrzebujesz, niezależnie od hinta.
+    fn build_switch(self, v: Value, else_bb: BasicBlock, num_cases_hint: int) -> Value is
+        return Value { handle: LLVMBuildSwitch(self.handle, v.handle, else_bb.handle, num_cases_hint) }
+    end
+    fn add_case(switch_v: Value, on_val: Value, dest: BasicBlock) is
+        LLVMAddCase(switch_v.handle, on_val.handle, dest.handle)
+    end
+
+    fn build_indirect_br(self, addr: Value, num_dests_hint: int) -> Value is
+        return Value { handle: LLVMBuildIndirectBr(self.handle, addr.handle, num_dests_hint) }
+    end
+    fn add_destination(indirect_br: Value, dest: BasicBlock) is
+        LLVMAddDestination(indirect_br.handle, dest.handle)
+    end
+
+    ;; ── Arytmetyka całkowitoliczbowa ─────────────────────────────────
+    fn build_add(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildAdd(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    ;; Warianty "nsw"/"nuw" (no signed/unsigned wrap) mówią LLVM-owi, że
+    ;; przepełnienie to UB — pozwala na agresywniejsze optymalizacje, gdy
+    ;; wiesz z typu H#-owego źródła, że przepełnienie nie zajdzie.
+    fn build_add_nsw(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildNSWAdd(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_add_nuw(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildNUWAdd(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_sub(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildSub(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_sub_nsw(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildNSWSub(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_mul(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildMul(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_mul_nsw(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildNSWMul(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_udiv(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildUDiv(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_sdiv(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildSDiv(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_urem(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildURem(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_srem(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildSRem(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_shl(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildShl(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_lshr(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildLShr(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_ashr(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildAShr(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_and(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildAnd(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_or(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildOr(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_xor(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildXor(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_neg(self, v: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildNeg(self.handle, v.handle, name) }
+    end
+    fn build_not(self, v: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildNot(self.handle, v.handle, name) }
+    end
+
+    ;; ── Arytmetyka zmiennoprzecinkowa ────────────────────────────────
+    fn build_fadd(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildFAdd(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_fsub(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildFSub(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_fmul(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildFMul(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_fdiv(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildFDiv(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_frem(self, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildFRem(self.handle, lhs.handle, rhs.handle, name) }
+    end
+    fn build_fneg(self, v: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildFNeg(self.handle, v.handle, name) }
+    end
+
+    ;; ── Porównania — `pred` to jedna ze stałych `INT_*`/`REAL_*` z
+    ;; src/predicates.h# (np. `INT_SLT` dla "signed less-than"). ────────
+    fn build_icmp(self, pred: i32, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildICmp(self.handle, pred, lhs.handle, rhs.handle, name) }
+    end
+    fn build_fcmp(self, pred: i32, lhs: Value, rhs: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildFCmp(self.handle, pred, lhs.handle, rhs.handle, name) }
+    end
+
+    ;; ── Pamięć ───────────────────────────────────────────────────────
+    fn build_alloca(self, ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildAlloca(self.handle, ty.handle, name) }
+    end
+    fn build_array_alloca(self, ty: Type, count: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildArrayAlloca(self.handle, ty.handle, count.handle, name) }
+    end
+    ;; `ty` = typ WCZYTYWANEJ wartości (od opaque pointers w LLVM 17+, `ptr`
+    ;; sam w sobie nie niesie informacji o typie spod adresu — musisz podać
+    ;; go jawnie, dokładnie jak `inkwell::Builder::build_load` przyjmujące
+    ;; `pointee_ty`).
+    fn build_load(self, ty: Type, ptr: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildLoad2(self.handle, ty.handle, ptr.handle, name) }
+    end
+    fn build_store(self, val: Value, ptr: Value) -> Value is
+        return Value { handle: LLVMBuildStore(self.handle, val.handle, ptr.handle) }
+    end
+
+    ;; GEP (GetElementPtr) — `elem_ty` to typ WSKAZYWANY przez `ptr` (tak
+    ;; jak przy `build_load`), `indices` to ścieżka indeksów dokładnie jak
+    ;; w LLVM-owym GEP (pierwszy indeks przechodzi przez sam wskaźnik,
+    ;; kolejne wchodzą w strukturę/tablicę). `in_bounds = true` -> GEP z
+    ;; gwarancją braku przepełnienia (lepsze optymalizacje, UB jeśli się
+    ;; mylisz co do granic).
+    fn build_gep(self, elem_ty: Type, ptr: Value, indices: [Value], name: string, in_bounds: bool) -> Value is
+        return Value { handle: obsidian_build_gep(self.handle, elem_ty.handle, ptr.handle, values_to_handles(indices), name, if in_bounds then 1 else 0) }
+    end
+    ;; Skrót do najczęstszego przypadku: `struct_ptr[0].pole_nr` —
+    ;; dwuindeksowy GEP (`[i32 0, i32 field_index]`), z automatycznym
+    ;; opakowaniem stałych indeksów.
+    fn build_struct_gep(self, ctx: Context, struct_ty: Type, ptr: Value, field_index: int, name: string) -> Value is
+        let i32_ty: Type = ctx.i32_type()
+        let zero: Value = ctx.const_int(i32_ty, 0, false)
+        let idx: Value = ctx.const_int(i32_ty, field_index, false)
+        return self.build_gep(struct_ty, ptr, [zero, idx], name, true)
+    end
+
+    ;; ── Rzutowania ───────────────────────────────────────────────────
+    fn build_trunc(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildTrunc(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_zext(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildZExt(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_sext(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildSExt(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_fp_trunc(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildFPTrunc(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_fp_ext(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildFPExt(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_fp_to_ui(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildFPToUI(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_fp_to_si(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildFPToSI(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_ui_to_fp(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildUIToFP(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_si_to_fp(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildSIToFP(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_ptr_to_int(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildPtrToInt(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_int_to_ptr(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildIntToPtr(self.handle, v.handle, dest_ty.handle, name) }
+    end
+    fn build_bit_cast(self, v: Value, dest_ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildBitCast(self.handle, v.handle, dest_ty.handle, name) }
+    end
+
+    ;; ── Wywołania funkcji ────────────────────────────────────────────
+    ;; `fn_ty` to typ funkcji (`FunctionValue::get_type()`), potrzebny
+    ;; jawnie od `LLVMBuildCall2` (wskaźniki do funkcji są dziś opaque tak
+    ;; samo jak reszta wskaźników).
+    fn build_call(self, fn_ty: Type, callee: FunctionValue, args: [Value], name: string) -> Value is
+        return Value { handle: obsidian_build_call(self.handle, fn_ty.handle, callee.handle, values_to_handles(args), name) }
+    end
+    fn build_invoke(self, fn_ty: Type, callee: FunctionValue, args: [Value], then_bb: BasicBlock, catch_bb: BasicBlock, name: string) -> Value is
+        return Value { handle: obsidian_build_invoke(self.handle, fn_ty.handle, callee.handle, values_to_handles(args), then_bb.handle, catch_bb.handle, name) }
+    end
+
+    ;; ── Różne ────────────────────────────────────────────────────────
+    fn build_select(self, cond: Value, then_v: Value, else_v: Value, name: string) -> Value is
+        return Value { handle: LLVMBuildSelect(self.handle, cond.handle, then_v.handle, else_v.handle, name) }
+    end
+
+    fn build_phi(self, ty: Type, name: string) -> Value is
+        return Value { handle: LLVMBuildPhi(self.handle, ty.handle, name) }
+    end
+    ;; `incoming_values[i]` dochodzi z `incoming_blocks[i]` — tablice
+    ;; muszą mieć tę samą długość.
+    fn phi_add_incoming(phi: Value, incoming_values: [Value], incoming_blocks: [BasicBlock]) is
+        obsidian_phi_add_incoming(phi.handle, values_to_handles(incoming_values), blocks_to_handles(incoming_blocks))
+    end
+
+    ;; String literal jako `ptr` gotowy do np. `printf`/`puts` — w
+    ;; przeciwieństwie do `Context::const_string` (surowa tablica `[N x i8]`
+    ;; bez rozpadu do wskaźnika).
+    fn build_global_string_ptr(self, s: string, name: string) -> Value is
+        return Value { handle: LLVMBuildGlobalStringPtr(self.handle, s, name) }
+    end
+
+    fn build_extract_value(self, agg: Value, index: int, name: string) -> Value is
+        return Value { handle: LLVMBuildExtractValue(self.handle, agg.handle, index, name) }
+    end
+    fn build_insert_value(self, agg: Value, elt: Value, index: int, name: string) -> Value is
+        return Value { handle: LLVMBuildInsertValue(self.handle, agg.handle, elt.handle, index, name) }
+    end
+end
