@@ -1,0 +1,101 @@
+mod ffi
+mod conv
+
+struct FunctionValue is
+    pub handle: int
+end
+
+impl FunctionValue is
+    ;; Rzutowanie w górę do ogólnego `Value` (np. żeby przekazać funkcję
+    ;; jako argument callback-a albo zapisać do zmiennej `[int]` z
+    ;; conv::values_to_handles).
+    fn as_value(self) -> Value is
+        return Value { handle: self.handle }
+    end
+
+    fn get_type(self) -> Type is
+        return Type { handle: LLVMTypeOf(self.handle) }
+    end
+
+    fn get_name(self) -> string is
+        return LLVMGetValueName2(self.handle)
+    end
+    fn set_name(self, name: string) is
+        LLVMSetValueName2(self.handle, name, string_len(name))
+    end
+
+    fn print(self) -> string is
+        return LLVMPrintValueToString(self.handle)
+    end
+
+    fn set_call_conv(self, cc: int) is
+        LLVMSetFunctionCallConv(self.handle, cc)
+    end
+    fn call_conv(self) -> int is
+        return LLVMGetFunctionCallConv(self.handle)
+    end
+    fn set_linkage(self, linkage: i32) is
+        LLVMSetLinkage(self.handle, linkage)
+    end
+
+    ;; ── Parametry ────────────────────────────────────────────────────
+    fn param_count(self) -> int is
+        return LLVMCountParams(self.handle)
+    end
+    fn get_param(self, idx: int) -> Value is
+        return Value { handle: LLVMGetParam(self.handle, idx) }
+    end
+    ;; Wszystkie parametry naraz, w kolejności deklaracji.
+    fn params(self) -> [Value] is
+        return handles_to_values(obsidian_get_params(self.handle))
+    end
+
+    ;; ── Podstawowe bloki ─────────────────────────────────────────────
+    fn append_basic_block(self, ctx: Context, name: string) -> BasicBlock is
+        return BasicBlock { handle: LLVMAppendBasicBlockInContext(ctx.handle, self.handle, name) }
+    end
+    fn insert_basic_block_before(self, ctx: Context, before: BasicBlock, name: string) -> BasicBlock is
+        return BasicBlock { handle: LLVMInsertBasicBlockInContext(ctx.handle, before.handle, name) }
+    end
+    fn entry_block(self) -> BasicBlock? is
+        let h: int = LLVMGetEntryBasicBlock(self.handle)
+        if h == 0 is return nil end
+        return BasicBlock { handle: h }
+    end
+    fn first_block(self) -> BasicBlock? is
+        let h: int = LLVMGetFirstBasicBlock(self.handle)
+        if h == 0 is return nil end
+        return BasicBlock { handle: h }
+    end
+    fn basic_block_count(self) -> int is
+        return LLVMCountBasicBlocks(self.handle)
+    end
+    ;; Wszystkie bloki w kolejności — przydatne do pełnego przejścia po
+    ;; ciele funkcji (np. własny analizator/optymalizacja na poziomie H#).
+    fn basic_blocks(self) -> [BasicBlock] is
+        let mut out: [BasicBlock] = []
+        let mut cur: int = LLVMGetFirstBasicBlock(self.handle)
+        while cur != 0 is
+            out.push(BasicBlock { handle: cur })
+            cur = LLVMGetNextBasicBlock(cur)
+        end
+        return out
+    end
+
+    ;; Usuwa CIAŁO I deklarację funkcji z modułu.
+    fn delete(self) is
+        LLVMDeleteFunction(self.handle)
+    end
+
+    ;; Zwraca `nil` jeśli funkcja jest poprawna, w przeciwnym razie krótki
+    ;; opis (dla pełnego komunikatu diagnostycznego użyj Module::verify).
+    fn verify(self) -> string? is
+        let msg: string = obsidian_verify_function(self.handle)
+        if msg == "" is return nil end
+        return msg
+    end
+
+    fn eq(self, other: FunctionValue) -> bool is
+        return self.handle == other.handle
+    end
+end
