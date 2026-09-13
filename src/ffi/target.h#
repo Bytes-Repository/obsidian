@@ -1,0 +1,30 @@
+extern dynamic [c, "LLVM-21"] is
+    ;; ── Target ───────────────────────────────────────────────────────────
+    fn LLVMGetFirstTarget() -> int
+    fn LLVMGetNextTarget(t: int) -> int
+    fn LLVMGetTargetName(t: int) -> string
+    fn LLVMGetTargetDescription(t: int) -> string
+    fn LLVMGetDefaultTargetTriple() -> string
+    fn LLVMGetHostCPUName() -> string
+    fn LLVMGetHostCPUFeatures() -> string
+    fn LLVMNormalizeTargetTriple(triple: string) -> string
+
+    ;; ── TargetMachine ────────────────────────────────────────────────────
+    fn LLVMCreateTargetMachine(t: int, triple: string, cpu: string, features: string, level: i32, reloc: i32, code_model: i32) -> int
+    fn LLVMDisposeTargetMachine(tm: int)
+    fn LLVMGetTargetMachineTarget(tm: int) -> int
+    fn LLVMGetTargetMachineTriple(tm: int) -> string
+    fn LLVMSetTargetMachineAsmVerbosity(tm: int, verbose: i32)
+    fn LLVMCreateTargetDataLayout(tm: int) -> int
+    fn LLVMCopyStringRepOfTargetData(td: int) -> string
+    fn LLVMSetModuleDataLayout(m: int, td: int)
+    fn LLVMDisposeTargetData(td: int)
+    fn LLVMABISizeOfType(td: int, ty: int) -> u64
+    fn LLVMABIAlignmentOfType(td: int, ty: int) -> u32
+    fn LLVMPointerSize(td: int) -> u32
+
+    ;; ── Error (dla LLVMRunPasses, patrz ffi/passes.h#) ──────────────────
+    fn LLVMGetErrorMessage(err: int) -> string
+    fn LLVMDisposeErrorMessage(msg: string)
+    fn LLVMConsumeError(err: int)
+end
