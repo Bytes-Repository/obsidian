@@ -1,0 +1,63 @@
+mod ffi
+
+struct PassOptions is
+    pub handle: int
+end
+
+impl PassOptions is
+    fn create() -> PassOptions is
+        return PassOptions { handle: LLVMCreatePassBuilderOptions() }
+    end
+    fn dispose(self) is
+        LLVMDisposePassBuilderOptions(self.handle)
+    end
+    fn set_verify_each(self, verify: bool) is
+        LLVMPassBuilderOptionsSetVerifyEach(self.handle, if verify then 1 else 0)
+    end
+    fn set_debug_logging(self, debug: bool) is
+        LLVMPassBuilderOptionsSetDebugLogging(self.handle, if debug then 1 else 0)
+    end
+    fn set_loop_unrolling(self, enable: bool) is
+        LLVMPassBuilderOptionsSetLoopUnrolling(self.handle, if enable then 1 else 0)
+    end
+    fn set_loop_vectorization(self, enable: bool) is
+        LLVMPassBuilderOptionsSetLoopVectorization(self.handle, if enable then 1 else 0)
+    end
+    fn set_slp_vectorization(self, enable: bool) is
+        LLVMPassBuilderOptionsSetSLPVectorization(self.handle, if enable then 1 else 0)
+    end
+    fn set_merge_functions(self, enable: bool) is
+        LLVMPassBuilderOptionsSetMergeFunctions(self.handle, if enable then 1 else 0)
+    end
+end
+
+;; Wolnostojąca funkcja (nie metoda Module), bo wymaga TargetMachine —
+;; odpowiednik `inkwell::Module::run_passes`.
+;;
+;; `passes` to tekstowy opis "pipeline'u" nowego PassManagera, np.:
+;;   "default<O2>"       — standardowy zestaw optymalizacji -O2
+;;   "default<O0>"       — praktycznie nic (dobre jako no-op sanity check)
+;;   "mem2reg"           — pojedynczy przebieg (promocja alloca -> SSA)
+;;   "instcombine,mem2reg,dce"  — ręcznie dobrany łańcuch przebiegów
+;;
+;; Zwraca `""` przy sukcesie, w przeciwnym razie komunikat błędu.
+pub fn run_passes(m: Module, passes: string, tm: TargetMachine, opts: PassOptions) -> string is
+    let err: int = LLVMRunPasses(m.handle, passes, tm.handle, opts.handle)
+    if err == 0 is return "" end
+    let msg: string = LLVMGetErrorMessage(err)
+    ;; LLVMGetErrorMessage "konsumuje" błąd (jak `LLVMConsumeError`) — nie
+    ;; wołaj obu na tym samym `err`. Zwrócony `msg` jest własnością LLVM-a
+    ;; (`LLVMDisposeErrorMessage`); patrz README.md o przecieku bufora,
+    ;; ten sam kompromis co przy `Module::print_to_string`.
+    return msg
+end
+
+;; Wygodny skrót: `run_passes(m, "default<O" + level_as_string + ">", tm, ...)`
+;; z domyślnymi opcjami (bez weryfikacji/debug loggingu po każdym przebiegu).
+pub fn optimize(m: Module, tm: TargetMachine, level: int) -> string is
+    let opts: PassOptions = PassOptions::create()
+    let pipeline: string = "default<O" + to_string(level) + ">"
+    let result: string = run_passes(m, pipeline, tm, opts)
+    opts.dispose()
+    return result
+end
