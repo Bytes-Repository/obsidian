@@ -1,0 +1,54 @@
+mod ffi
+
+struct BasicBlock is
+    pub handle: int
+end
+
+impl BasicBlock is
+    fn parent(self) -> FunctionValue is
+        return FunctionValue { handle: LLVMGetBasicBlockParent(self.handle) }
+    end
+
+    fn get_name(self) -> string is
+        return LLVMGetBasicBlockName(self.handle)
+    end
+
+    ;; Ostatnia instrukcja bloku, jeśli to terminator (`ret`/`br`/`switch`/
+    ;; `unreachable`/...) — `nil` jeśli blok jest jeszcze "otwarty"
+    ;; (częsty stan podczas budowania IR krok po kroku).
+    fn terminator(self) -> Value? is
+        let h: int = LLVMGetBasicBlockTerminator(self.handle)
+        if h == 0 is return nil end
+        return Value { handle: h }
+    end
+
+    fn next(self) -> BasicBlock? is
+        let h: int = LLVMGetNextBasicBlock(self.handle)
+        if h == 0 is return nil end
+        return BasicBlock { handle: h }
+    end
+
+    fn move_after(self, other: BasicBlock) is
+        LLVMMoveBasicBlockAfter(self.handle, other.handle)
+    end
+
+    fn remove_from_parent(self) is
+        LLVMRemoveBasicBlockFromParent(self.handle)
+    end
+
+    ;; UWAGA: usuwa blok WRAZ z jego instrukcjami — użyj `remove_from_parent`
+    ;; jeśli chcesz go tylko odpiąć (np. żeby przenieść gdzie indziej).
+    fn delete(self) is
+        LLVMDeleteBasicBlock(self.handle)
+    end
+
+    ;; Reprezentacja bloku jako `Value` — potrzebne np. do
+    ;; `Builder::build_indirect_br`/`blockaddress`.
+    fn as_value(self) -> Value is
+        return Value { handle: LLVMBasicBlockAsValue(self.handle) }
+    end
+
+    fn eq(self, other: BasicBlock) -> bool is
+        return self.handle == other.handle
+    end
+end
