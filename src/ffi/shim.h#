@@ -1,0 +1,44 @@
+extern static [c, "obsidian_shim"] is
+    ;; Typy z tablicą typów składowych
+    fn obsidian_function_type(ret_ty: int, param_tys: [int], is_var_arg: i32) -> int
+    fn obsidian_struct_type_in_context(ctx: int, elem_tys: [int], packed: i32) -> int
+    fn obsidian_struct_set_body(struct_ty: int, elem_tys: [int], packed: i32)
+    fn obsidian_get_param_types(fn_ty: int) -> [int]
+    ;; LLVMGetStructName zwraca C-owy NULL dla struktur anonimowych — ten
+    ;; wrapper zamienia to bezpiecznie na "".
+    fn obsidian_struct_name_safe(struct_ty: int) -> string
+
+    ;; Wartości z tablicą argumentów/indeksów/wcieleń
+    fn obsidian_build_call(b: int, fn_ty: int, callee: int, args: [int], name: string) -> int
+    fn obsidian_build_invoke(b: int, fn_ty: int, callee: int, args: [int], then_bb: int, catch_bb: int, name: string) -> int
+    fn obsidian_build_gep(b: int, elem_ty: int, ptr: int, indices: [int], name: string, in_bounds: i32) -> int
+    fn obsidian_phi_add_incoming(phi: int, values: [int], blocks: [int])
+    fn obsidian_const_array(elem_ty: int, vals: [int]) -> int
+    fn obsidian_const_struct_in_context(ctx: int, vals: [int], packed: i32) -> int
+    fn obsidian_const_named_struct(struct_ty: int, vals: [int]) -> int
+    fn obsidian_const_vector(vals: [int]) -> int
+    fn obsidian_get_params(fn_val: int) -> [int]
+
+    ;; Weryfikacja
+    fn obsidian_verify_module(m: int) -> string
+    fn obsidian_verify_function(fn_val: int) -> string
+
+    ;; Target / TargetMachine (owijają out-param LLVMBool + char**)
+    fn obsidian_init_native_target() -> i32
+    fn obsidian_get_target_from_triple(triple: string) -> int
+    fn obsidian_target_machine_emit_to_file(tm: int, m: int, filename: string, file_type: i32) -> i32
+    fn obsidian_print_module_to_file(m: int, filename: string) -> i32
+
+    ;; ExecutionEngine (MCJIT / interpreter)
+    fn obsidian_create_execution_engine_for_module(m: int) -> int
+    fn obsidian_create_jit_compiler_for_module(m: int, opt_level: i32) -> int
+    fn obsidian_create_interpreter_for_module(m: int) -> int
+    fn obsidian_run_function(ee: int, fn_val: int, args: [int]) -> int
+
+    ;; IRReader (round-trip testowy)
+    fn obsidian_parse_ir_in_context(ctx: int, ir_text: string) -> int
+
+    ;; Stan błędu ostatniej operacji "out-param"
+    fn obsidian_last_error() -> string
+    fn obsidian_clear_error()
+end
