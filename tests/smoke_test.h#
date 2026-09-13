@@ -1,0 +1,95 @@
+mod context
+mod module
+mod types
+mod values
+mod function
+mod basic_block
+mod builder
+mod predicates
+mod execution_engine
+mod target_machine
+
+fn check(name: string, cond: bool) -> bool is
+    if cond is
+        write("OK   " + name)
+    else
+        write("FAIL " + name)
+    end
+    return cond
+end
+
+fn main() is
+    let mut failures: int = 0
+    let ctx: Context = Context::create()
+
+    ;; ── Typy ─────────────────────────────────────────────────────────
+    let i32_ty: Type = ctx.i32_type()
+    if !check("i32_type.is_integer", i32_ty.is_integer()) is failures = failures + 1 end
+    if !check("i32_type.int_width == 32", i32_ty.int_width() == 32) is failures = failures + 1 end
+    if !check("f64_type.is_float_family", ctx.f64_type().is_float_family()) is failures = failures + 1 end
+
+    let field_tys: [Type] = [i32_ty, i32_ty]
+    let struct_ty: Type = ctx.struct_type(field_tys, false)
+    if !check("struct_type.is_struct", struct_ty.is_struct()) is failures = failures + 1 end
+    if !check("struct_type.struct_element_count == 2", struct_ty.struct_element_count() == 2) is failures = failures + 1 end
+
+    let fn_ty: Type = i32_ty.fn_type([i32_ty, i32_ty], false)
+    if !check("fn_type.is_function", fn_ty.is_function()) is failures = failures + 1 end
+    if !check("fn_type.param_count == 2", fn_ty.param_count() == 2) is failures = failures + 1 end
+    if !check("fn_type.return_type == i32", fn_ty.return_type().eq(i32_ty)) is failures = failures + 1 end
+
+    ;; ── Moduł + funkcja + builder ────────────────────────────────────
+    let m: Module = ctx.create_module("smoke")
+    let sum_fn: FunctionValue = m.add_function("sum", fn_ty)
+    if !check("param_count == 2", sum_fn.param_count() == 2) is failures = failures + 1 end
+
+    let entry: BasicBlock = sum_fn.append_basic_block(ctx, "entry")
+    let b: Builder = ctx.create_builder()
+    b.position_at_end(entry)
+    let sum_v: Value = b.build_add(sum_fn.get_param(0), sum_fn.get_param(1), "s")
+    b.build_ret(sum_v)
+    b.dispose()
+
+    if !check("module.is_valid", m.is_valid()) is failures = failures + 1 end
+    if !check("function.verify == nil (poprawna)", sum_fn.verify() == nil) is failures = failures + 1 end
+
+    let ir: string = m.print_to_string()
+    if !check("IR zawiera 'define'", ir.contains("define")) is failures = failures + 1 end
+    if !check("IR zawiera nazwę funkcji 'sum'", ir.contains("sum")) is failures = failures + 1 end
+
+    ;; ── Round-trip przez IRReader ────────────────────────────────────
+    let reparsed = ctx.parse_ir(ir)
+    if !check("parse_ir(print_to_string(m)) != nil", reparsed != nil) is failures = failures + 1 end
+
+    ;; ── JIT (interpreter) ────────────────────────────────────────────
+    ExecutionEngine::link_in_mcjit()
+    let ee = ExecutionEngine::create_for_module(m)
+    if !check("execution_engine utworzony", ee != nil) is failures = failures + 1 end
+    if ee != nil is
+        let a: GenericValue = GenericValue::of_int(i32_ty, 17, true)
+        let bb: GenericValue = GenericValue::of_int(i32_ty, 25, true)
+        let r: GenericValue = ee.run_function(sum_fn, [a, bb])
+        if !check("sum(17, 25) == 42", r.to_int_signed() == 42) is failures = failures + 1 end
+        r.dispose()
+        a.dispose()
+        bb.dispose()
+        ee.dispose() ;; zwalnia też `m`
+    end
+
+    ;; ── Target / TargetMachine (nie emitujemy pliku w smoke teście,
+    ;; tylko sprawdzamy że backend hosta w ogóle się inicjalizuje) ─────
+    if !check("Target::init_native", Target::init_native()) is failures = failures + 1 end
+    let triple: string = Target::default_triple()
+    if !check("default_triple niepusty", triple != "") is failures = failures + 1 end
+    let target = Target::from_triple(triple)
+    if !check("from_triple(default_triple) != nil", target != nil) is failures = failures + 1 end
+
+    write("")
+    if failures == 0 is
+        write("=== WSZYSTKO OK ===")
+    else
+        write("=== " + to_string(failures) + " BŁĘDÓW ===")
+    end
+
+    ctx.dispose()
+end
