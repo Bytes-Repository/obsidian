@@ -1,0 +1,200 @@
+extern dynamic [c, "LLVM-21"] is
+    ;; ── Context ──────────────────────────────────────────────────────────
+    fn LLVMContextCreate() -> int
+    fn LLVMContextDispose(ctx: int)
+    fn LLVMGetGlobalContext() -> int
+    fn LLVMContextSetDiscardValueNames(ctx: int, discard: i32)
+
+    ;; ── Module ───────────────────────────────────────────────────────────
+    fn LLVMModuleCreateWithNameInContext(name: string, ctx: int) -> int
+    fn LLVMDisposeModule(m: int)
+    fn LLVMCloneModule(m: int) -> int
+    fn LLVMPrintModuleToString(m: int) -> string
+    fn LLVMSetModuleIdentifier(m: int, ident: string)
+    fn LLVMSetSourceFileName(m: int, name: string)
+    fn LLVMSetDataLayout(m: int, layout: string)
+    fn LLVMGetDataLayoutStr(m: int) -> string
+    fn LLVMSetTarget(m: int, triple: string)
+    fn LLVMGetTarget(m: int) -> string
+    fn LLVMAddFunction(m: int, name: string, fn_ty: int) -> int
+    fn LLVMGetNamedFunction(m: int, name: string) -> int
+    fn LLVMGetFirstFunction(m: int) -> int
+    fn LLVMGetNextFunction(fn_val: int) -> int
+    fn LLVMAddGlobal(m: int, ty: int, name: string) -> int
+    fn LLVMGetNamedGlobal(m: int, name: string) -> int
+    fn LLVMWriteBitcodeToFile(m: int, path: string) -> i32
+
+    ;; ── Types: primitivos & specjalne ───────────────────────────────────
+    fn LLVMVoidTypeInContext(ctx: int) -> int
+    fn LLVMInt1TypeInContext(ctx: int) -> int
+    fn LLVMInt8TypeInContext(ctx: int) -> int
+    fn LLVMInt16TypeInContext(ctx: int) -> int
+    fn LLVMInt32TypeInContext(ctx: int) -> int
+    fn LLVMInt64TypeInContext(ctx: int) -> int
+    fn LLVMInt128TypeInContext(ctx: int) -> int
+    fn LLVMIntTypeInContext(ctx: int, num_bits: u32) -> int
+    fn LLVMFloatTypeInContext(ctx: int) -> int
+    fn LLVMDoubleTypeInContext(ctx: int) -> int
+    fn LLVMPointerTypeInContext(ctx: int, address_space: u32) -> int
+    fn LLVMArrayType2(elem_ty: int, count: u64) -> int
+    fn LLVMVectorType(elem_ty: int, count: u32) -> int
+    fn LLVMGetTypeKind(ty: int) -> i32
+    fn LLVMGetIntTypeWidth(ty: int) -> u32
+    fn LLVMGetElementType(ty: int) -> int
+    fn LLVMGetArrayLength2(ty: int) -> u64
+    fn LLVMCountParamTypes(fn_ty: int) -> u32
+    fn LLVMIsFunctionVarArg(fn_ty: int) -> i32
+    fn LLVMGetReturnType(fn_ty: int) -> int
+    fn LLVMStructCreateNamed(ctx: int, name: string) -> int
+    fn LLVMCountStructElementTypes(struct_ty: int) -> u32
+    fn LLVMIsPackedStruct(struct_ty: int) -> i32
+    fn LLVMIsOpaqueStruct(struct_ty: int) -> i32
+    fn LLVMTypeOf(val: int) -> int
+    fn LLVMPrintTypeToString(ty: int) -> string
+
+    ;; ── Constants ────────────────────────────────────────────────────────
+    fn LLVMConstInt(ty: int, val: u64, sign_extend: i32) -> int
+    fn LLVMConstReal(ty: int, val: f64) -> int
+    fn LLVMConstRealOfString(ty: int, text: string) -> int
+    fn LLVMConstIntOfString(ty: int, text: string, radix: u8) -> int
+    fn LLVMConstStringInContext2(ctx: int, s: string, length: u64, dont_null_terminate: i32) -> int
+    fn LLVMConstNull(ty: int) -> int
+    fn LLVMConstAllOnes(ty: int) -> int
+    fn LLVMGetUndef(ty: int) -> int
+    fn LLVMGetPoison(ty: int) -> int
+    fn LLVMConstPointerNull(ty: int) -> int
+    fn LLVMSizeOf(ty: int) -> int
+    fn LLVMAlignOf(ty: int) -> int
+    fn LLVMConstNeg(v: int) -> int
+    fn LLVMConstNot(v: int) -> int
+    fn LLVMConstIntGetSExtValue(v: int) -> i64
+    fn LLVMConstIntGetZExtValue(v: int) -> u64
+    fn LLVMConstRealGetDouble(v: int, loses_info: i32) -> f64
+
+    ;; ── Values: ogólne ──────────────────────────────────────────────────
+    fn LLVMSetValueName2(v: int, name: string, len: u64)
+    fn LLVMGetValueName2(v: int) -> string
+    fn LLVMPrintValueToString(v: int) -> string
+    fn LLVMIsConstant(v: int) -> i32
+    fn LLVMIsUndef(v: int) -> i32
+    fn LLVMIsPoison(v: int) -> i32
+    fn LLVMIsNull(v: int) -> i32
+    fn LLVMIsAFunction(v: int) -> int
+    fn LLVMIsAInstruction(v: int) -> int
+    fn LLVMIsAArgument(v: int) -> int
+    fn LLVMIsABasicBlock(v: int) -> int
+    fn LLVMDeleteFunction(fn_val: int)
+    fn LLVMGetLinkage(v: int) -> i32
+    fn LLVMSetLinkage(v: int, linkage: i32)
+    fn LLVMGetVisibility(v: int) -> i32
+    fn LLVMSetVisibility(v: int, vis: i32)
+    fn LLVMSetFunctionCallConv(fn_val: int, cc: u32)
+    fn LLVMGetFunctionCallConv(fn_val: int) -> u32
+
+    ;; ── Globals ──────────────────────────────────────────────────────────
+    fn LLVMSetInitializer(global: int, val: int)
+    fn LLVMGetInitializer(global: int) -> int
+    fn LLVMSetGlobalConstant(global: int, is_constant: i32)
+    fn LLVMIsGlobalConstant(global: int) -> i32
+    fn LLVMSetThreadLocal(global: int, is_thread_local: i32)
+    fn LLVMDeleteGlobal(global: int)
+
+    ;; ── Function: parametry i podstawowe bloki ──────────────────────────
+    fn LLVMCountParams(fn_val: int) -> u32
+    fn LLVMGetParam(fn_val: int, idx: u32) -> int
+    fn LLVMGetParamParent(param: int) -> int
+    fn LLVMAppendBasicBlockInContext(ctx: int, fn_val: int, name: string) -> int
+    fn LLVMInsertBasicBlockInContext(ctx: int, before_bb: int, name: string) -> int
+    fn LLVMDeleteBasicBlock(bb: int)
+    fn LLVMRemoveBasicBlockFromParent(bb: int)
+    fn LLVMMoveBasicBlockAfter(bb: int, move_after: int)
+    fn LLVMGetBasicBlockParent(bb: int) -> int
+    fn LLVMGetEntryBasicBlock(fn_val: int) -> int
+    fn LLVMGetFirstBasicBlock(fn_val: int) -> int
+    fn LLVMGetNextBasicBlock(bb: int) -> int
+    fn LLVMCountBasicBlocks(fn_val: int) -> u32
+    fn LLVMGetBasicBlockTerminator(bb: int) -> int
+    fn LLVMGetBasicBlockName(bb: int) -> string
+    fn LLVMBasicBlockAsValue(bb: int) -> int
+    fn LLVMValueAsBasicBlock(v: int) -> int
+
+    ;; ── Builder: lifecycle i pozycjonowanie ──────────────────────────────
+    fn LLVMCreateBuilderInContext(ctx: int) -> int
+    fn LLVMDisposeBuilder(b: int)
+    fn LLVMPositionBuilderAtEnd(b: int, bb: int)
+    fn LLVMPositionBuilderBefore(b: int, instr: int)
+    fn LLVMGetInsertBlock(b: int) -> int
+    fn LLVMClearInsertionPosition(b: int)
+
+    ;; ── Builder: terminatory ─────────────────────────────────────────────
+    fn LLVMBuildRet(b: int, v: int) -> int
+    fn LLVMBuildRetVoid(b: int) -> int
+    fn LLVMBuildBr(b: int, dest: int) -> int
+    fn LLVMBuildCondBr(b: int, cond_v: int, then_bb: int, else_bb: int) -> int
+    fn LLVMBuildSwitch(b: int, v: int, else_bb: int, num_cases: u32) -> int
+    fn LLVMAddCase(switch_v: int, on_val: int, dest: int)
+    fn LLVMBuildUnreachable(b: int) -> int
+    fn LLVMBuildIndirectBr(b: int, addr: int, num_dests: u32) -> int
+    fn LLVMAddDestination(indirect_br: int, dest: int)
+
+    ;; ── Builder: arytmetyka i logika ─────────────────────────────────────
+    fn LLVMBuildAdd(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildNSWAdd(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildNUWAdd(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildFAdd(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildSub(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildNSWSub(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildFSub(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildMul(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildNSWMul(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildFMul(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildUDiv(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildSDiv(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildFDiv(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildURem(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildSRem(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildFRem(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildShl(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildLShr(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildAShr(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildAnd(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildOr(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildXor(b: int, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildNeg(b: int, v: int, name: string) -> int
+    fn LLVMBuildFNeg(b: int, v: int, name: string) -> int
+    fn LLVMBuildNot(b: int, v: int, name: string) -> int
+
+    ;; ── Builder: porównania ─────────────────────────────────────────────
+    fn LLVMBuildICmp(b: int, pred: i32, lhs: int, rhs: int, name: string) -> int
+    fn LLVMBuildFCmp(b: int, pred: i32, lhs: int, rhs: int, name: string) -> int
+
+    ;; ── Builder: pamięć ──────────────────────────────────────────────────
+    fn LLVMBuildAlloca(b: int, ty: int, name: string) -> int
+    fn LLVMBuildArrayAlloca(b: int, ty: int, count: int, name: string) -> int
+    fn LLVMBuildLoad2(b: int, ty: int, ptr: int, name: string) -> int
+    fn LLVMBuildStore(b: int, val: int, ptr: int) -> int
+    fn LLVMSetAlignment(v: int, align_bytes: u32)
+    fn LLVMGetAlignment(v: int) -> u32
+    fn LLVMSetVolatile(v: int, is_volatile: i32)
+
+    ;; ── Builder: rzutowania ──────────────────────────────────────────────
+    fn LLVMBuildTrunc(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildZExt(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildSExt(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildFPTrunc(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildFPExt(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildFPToUI(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildFPToSI(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildUIToFP(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildSIToFP(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildPtrToInt(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildIntToPtr(b: int, v: int, dest_ty: int, name: string) -> int
+    fn LLVMBuildBitCast(b: int, v: int, dest_ty: int, name: string) -> int
+
+    ;; ── Builder: różne ───────────────────────────────────────────────────
+    fn LLVMBuildSelect(b: int, cond_v: int, then_v: int, else_v: int, name: string) -> int
+    fn LLVMBuildPhi(b: int, ty: int, name: string) -> int
+    fn LLVMBuildGlobalStringPtr(b: int, s: string, name: string) -> int
+    fn LLVMBuildExtractValue(b: int, agg: int, index: u32, name: string) -> int
+    fn LLVMBuildInsertValue(b: int, agg: int, elt: int, index: u32, name: string) -> int
+end
