@@ -1,0 +1,117 @@
+mod ffi
+mod conv
+
+struct Module is
+    pub handle: int
+end
+
+impl Module is
+    fn dispose(self) is
+        LLVMDisposeModule(self.handle)
+    end
+
+    fn clone(self) -> Module is
+        return Module { handle: LLVMCloneModule(self.handle) }
+    end
+
+    ;; ── Metadane ─────────────────────────────────────────────────────
+    fn set_source_file_name(self, name: string) is
+        LLVMSetSourceFileName(self.handle, name)
+    end
+    fn set_identifier(self, ident: string) is
+        LLVMSetModuleIdentifier(self.handle, ident)
+    end
+    fn set_target_triple(self, triple: string) is
+        LLVMSetTarget(self.handle, triple)
+    end
+    fn target_triple(self) -> string is
+        return LLVMGetTarget(self.handle)
+    end
+    fn set_data_layout(self, layout: string) is
+        LLVMSetDataLayout(self.handle, layout)
+    end
+    fn data_layout_str(self) -> string is
+        return LLVMGetDataLayoutStr(self.handle)
+    end
+
+    ;; ── Funkcje ──────────────────────────────────────────────────────
+    ;; `fn_type` powinien pochodzić z `SomeType.fn_type([...], false)` —
+    ;; patrz src/types.h#.
+    fn add_function(self, name: string, fn_ty: Type) -> FunctionValue is
+        return FunctionValue { handle: LLVMAddFunction(self.handle, name, fn_ty.handle) }
+    end
+
+    ;; Zwraca `nil` jeśli funkcja o tej nazwie nie istnieje w module —
+    ;; odpowiednik `inkwell::Module::get_function`.
+    fn get_function(self, name: string) -> FunctionValue? is
+        let h: int = LLVMGetNamedFunction(self.handle, name)
+        if h == 0 is return nil end
+        return FunctionValue { handle: h }
+    end
+
+    fn first_function(self) -> FunctionValue? is
+        let h: int = LLVMGetFirstFunction(self.handle)
+        if h == 0 is return nil end
+        return FunctionValue { handle: h }
+    end
+
+    ;; Wszystkie funkcje modułu (deklaracje i definicje) w kolejności
+    ;; dodania — przydatne do np. "przejdź po wszystkich funkcjach i
+    ;; zweryfikuj każdą z osobna".
+    fn functions(self) -> [FunctionValue] is
+        let mut out: [FunctionValue] = []
+        let mut cur: int = LLVMGetFirstFunction(self.handle)
+        while cur != 0 is
+            out.push(FunctionValue { handle: cur })
+            cur = LLVMGetNextFunction(cur)
+        end
+        return out
+    end
+
+    ;; ── Globalne zmienne ─────────────────────────────────────────────
+    fn add_global(self, ty: Type, name: string) -> Value is
+        return Value { handle: LLVMAddGlobal(self.handle, ty.handle, name) }
+    end
+    fn get_global(self, name: string) -> Value? is
+        let h: int = LLVMGetNamedGlobal(self.handle, name)
+        if h == 0 is return nil end
+        return Value { handle: h }
+    end
+
+    ;; ── Wyjście ──────────────────────────────────────────────────────
+    fn print_to_string(self) -> string is
+        ;; UWAGA: LLVM zwraca tu bufor o którym oczekuje że wywołujący
+        ;; go zwolni (`LLVMDisposeMessage`). H#'s `extern` przekazuje
+        ;; zwrócony `char*` jako H#-owy `string` WPROST, bez kopiowania
+        ;; (patrz README.md, sekcja "Zarządzanie pamięcią") — dla
+        ;; krótko żyjącego procesu narzędzia kompilatorowego to celowy,
+        ;; udokumentowany kompromis: bufor przecieka zamiast ryzykować
+        ;; use-after-free przez przedwczesne zwolnienie.
+        return LLVMPrintModuleToString(self.handle)
+    end
+
+    fn write_bitcode_to_file(self, path: string) -> bool is
+        return LLVMWriteBitcodeToFile(self.handle, path) == 0
+    end
+
+    ;; Zwraca `""` przy sukcesie, w przeciwnym razie komunikat błędu.
+    fn print_to_file(self, path: string) -> string is
+        if obsidian_print_module_to_file(self.handle, path) == 0 is
+            return ""
+        end
+        return obsidian_last_error()
+    end
+
+    ;; ── Weryfikacja ──────────────────────────────────────────────────
+    ;; Zwraca `nil` jeśli moduł jest poprawny, w przeciwnym razie opis
+    ;; błędu z LLVM-owego weryfikatora (`LLVMVerifyModule`).
+    fn verify(self) -> string? is
+        let msg: string = obsidian_verify_module(self.handle)
+        if msg == "" is return nil end
+        return msg
+    end
+
+    fn is_valid(self) -> bool is
+        return obsidian_verify_module(self.handle) == ""
+    end
+end
