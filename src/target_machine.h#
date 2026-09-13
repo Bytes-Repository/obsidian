@@ -1,0 +1,134 @@
+mod ffi
+
+struct Target is
+    pub handle: int
+end
+
+struct TargetMachine is
+    pub handle: int
+end
+
+struct TargetData is
+    pub handle: int
+end
+
+impl Target is
+    ;; Inicjalizuje backend dla ARCHITEKTURY HOSTA (x86_64, aarch64, ...) —
+    ;; wystarczające dla zdecydowanej większości przypadków ("skompiluj to,
+    ;; na czym stoisz"). Wołaj RAZ, na starcie programu, przed jakimkolwiek
+    ;; użyciem TargetMachine/ExecutionEngine. Zwraca `false` przy błędzie
+    ;; inicjalizacji backendu.
+    ;;
+    ;; Obsidian 0.1 celuje w LLVM 21 zbudowany z domyślnym zestawem
+    ;; targetów; jeśli potrzebujesz cross-compilacji na architekturę INNĄ
+    ;; niż host, Twój LLVM musi mieć wbudowany odpowiedni backend — Obsidian
+    ;; tego nie kontroluje (to ustawienie kompilacji samego LLVM-a).
+    fn init_native() -> bool is
+        return obsidian_init_native_target() == 0
+    end
+
+    ;; Domyślny triplet dla maszyny, na której faktycznie działa proces
+    ;; (np. "x86_64-unknown-linux-gnu") — zwykle to, czego chcesz dla
+    ;; zwykłej (nie cross-) kompilacji.
+    fn default_triple() -> string is
+        return LLVMGetDefaultTargetTriple()
+    end
+    fn host_cpu_name() -> string is
+        return LLVMGetHostCPUName()
+    end
+    fn host_cpu_features() -> string is
+        return LLVMGetHostCPUFeatures()
+    end
+    fn normalize_triple(triple: string) -> string is
+        return LLVMNormalizeTargetTriple(triple)
+    end
+
+    ;; Zwraca `nil` jeśli triplet jest nierozpoznany / backend niedostępny
+    ;; w tym builddzie LLVM-a (patrz `obsidian::last_error()`).
+    fn from_triple(triple: string) -> Target? is
+        let h: int = obsidian_get_target_from_triple(triple)
+        if h == 0 is return nil end
+        return Target { handle: h }
+    end
+
+    fn first() -> Target? is
+        let h: int = LLVMGetFirstTarget()
+        if h == 0 is return nil end
+        return Target { handle: h }
+    end
+    fn next(self) -> Target? is
+        let h: int = LLVMGetNextTarget(self.handle)
+        if h == 0 is return nil end
+        return Target { handle: h }
+    end
+    fn name(self) -> string is
+        return LLVMGetTargetName(self.handle)
+    end
+    fn description(self) -> string is
+        return LLVMGetTargetDescription(self.handle)
+    end
+
+    ;; `cpu`/`features` mogą być `""` (LLVM dobierze rozsądne domyślne).
+    ;; Dla kodu, który MA działać na tym samym CPU co kompilacja, użyj
+    ;; `Target::host_cpu_name()`/`host_cpu_features()`.
+    fn create_target_machine(self, triple: string, cpu: string, features: string, opt_level: i32, reloc: i32, code_model: i32) -> TargetMachine is
+        return TargetMachine { handle: LLVMCreateTargetMachine(self.handle, triple, cpu, features, opt_level, reloc, code_model) }
+    end
+end
+
+impl TargetMachine is
+    fn dispose(self) is
+        LLVMDisposeTargetMachine(self.handle)
+    end
+
+    fn triple(self) -> string is
+        return LLVMGetTargetMachineTriple(self.handle)
+    end
+    fn target(self) -> Target is
+        return Target { handle: LLVMGetTargetMachineTarget(self.handle) }
+    end
+    fn set_asm_verbosity(self, verbose: bool) is
+        LLVMSetTargetMachineAsmVerbosity(self.handle, if verbose then 1 else 0)
+    end
+
+    fn create_target_data(self) -> TargetData is
+        return TargetData { handle: LLVMCreateTargetDataLayout(self.handle) }
+    end
+
+    ;; Ustawia `module.data_layout` na layout tej maszyny — rób to ZAWSZE
+    ;; przed emitowaniem obiektu, żeby rozmiary/wyrównania w wygenerowanym
+    ;; kodzie zgadzały się z docelową platformą (`inkwell` robi to samo w
+    ;; `TargetMachine::write_to_file`, tu jest to jawny, osobny krok).
+    fn set_module_data_layout(self, m: Module) is
+        let td: TargetData = self.create_target_data()
+        LLVMSetModuleDataLayout(m.handle, td.handle)
+    end
+
+    ;; Zwraca `""` przy sukcesie, w przeciwnym razie komunikat błędu.
+    ;; `file_type`: `FILE_TYPE_OBJECT` (.o, do zlinkowania) albo
+    ;; `FILE_TYPE_ASSEMBLY` (.s, czytelny tekst) — stałe z predicates.h#.
+    fn emit_to_file(self, m: Module, filename: string, file_type: i32) -> string is
+        if obsidian_target_machine_emit_to_file(self.handle, m.handle, filename, file_type) == 0 is
+            return ""
+        end
+        return obsidian_last_error()
+    end
+end
+
+impl TargetData is
+    fn dispose(self) is
+        LLVMDisposeTargetData(self.handle)
+    end
+    fn to_string_rep(self) -> string is
+        return LLVMCopyStringRepOfTargetData(self.handle)
+    end
+    fn abi_size_of(self, ty: Type) -> int is
+        return LLVMABISizeOfType(self.handle, ty.handle)
+    end
+    fn abi_alignment_of(self, ty: Type) -> int is
+        return LLVMABIAlignmentOfType(self.handle, ty.handle)
+    end
+    fn pointer_size(self) -> int is
+        return LLVMPointerSize(self.handle)
+    end
+end
