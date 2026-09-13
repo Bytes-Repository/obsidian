@@ -1,1 +1,16 @@
+[package]
+-> name        => obsidian
+-> version     => 0.1.0
+-> description => LLVM wrapper dla H# (odpowiednik inkwell) — build LLVM21
+-> author      => Bytes Developers
+-> license     => MIT
 
+[build]
+-> lang    => h#
+-> entry   => src/lib.h#
+-> output  => build/obsidian
+-> emit    => lib
+
+[deps]
+-> LLVM-21 => dynamic
+-> obsidian_shim => static
