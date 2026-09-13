@@ -1,0 +1,13 @@
+extern dynamic [c, "LLVM-21"] is
+    fn LLVMCreatePassBuilderOptions() -> int
+    fn LLVMPassBuilderOptionsSetVerifyEach(opts: int, verify: i32)
+    fn LLVMPassBuilderOptionsSetDebugLogging(opts: int, debug: i32)
+    fn LLVMPassBuilderOptionsSetLoopUnrolling(opts: int, enable: i32)
+    fn LLVMPassBuilderOptionsSetLoopVectorization(opts: int, enable: i32)
+    fn LLVMPassBuilderOptionsSetSLPVectorization(opts: int, enable: i32)
+    fn LLVMPassBuilderOptionsSetMergeFunctions(opts: int, enable: i32)
+    fn LLVMDisposePassBuilderOptions(opts: int)
+    ;; Zwraca LLVMErrorRef (0 = sukces). `passes` to tekstowy "pipeline",
+    ;; np. "default<O2>", "default<O0>", "instcombine,mem2reg".
+    fn LLVMRunPasses(m: int, passes: string, tm: int, opts: int) -> int
+end
