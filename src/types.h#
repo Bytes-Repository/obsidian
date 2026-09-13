@@ -1,0 +1,130 @@
+mod ffi
+mod conv
+mod predicates
+
+struct Type is
+    pub handle: int
+end
+
+impl Type is
+    ;; ── Introspekcja ──────────────────────────────────────────────────
+    fn kind(self) -> i32 is
+        return LLVMGetTypeKind(self.handle)
+    end
+
+    fn is_void(self) -> bool is return self.kind() == TYPE_KIND_VOID end
+    fn is_integer(self) -> bool is return self.kind() == TYPE_KIND_INTEGER end
+    fn is_float_family(self) -> bool is
+        let k: i32 = self.kind()
+        return k == TYPE_KIND_FLOAT || k == TYPE_KIND_DOUBLE
+    end
+    fn is_pointer(self) -> bool is return self.kind() == TYPE_KIND_POINTER end
+    fn is_function(self) -> bool is return self.kind() == TYPE_KIND_FUNCTION end
+    fn is_struct(self) -> bool is return self.kind() == TYPE_KIND_STRUCT end
+    fn is_array(self) -> bool is return self.kind() == TYPE_KIND_ARRAY end
+    fn is_vector(self) -> bool is return self.kind() == TYPE_KIND_VECTOR end
+
+    ;; Szerokość w bitach — tylko sensowne dla `is_integer() == true`.
+    fn int_width(self) -> int is
+        return LLVMGetIntTypeWidth(self.handle)
+    end
+
+    ;; Typ elementu — działa dla pointer/array/vector (to, co `inkwell`
+    ;; nazywa osobno `PointerType::get_element_type` itd.). Od LLVM 17
+    ;; wskaźniki są "opaque" (bez zaszytego typu wskazywanego), więc dla
+    ;; `is_pointer()` ta funkcja jest historyczna/rzadko przydatna —
+    ;; zostaw ją tylko dla array/vector w nowym kodzie.
+    fn element_type(self) -> Type is
+        return Type { handle: LLVMGetElementType(self.handle) }
+    end
+
+    fn array_length(self) -> int is
+        return LLVMGetArrayLength2(self.handle)
+    end
+
+    ;; ── Funkcje ──────────────────────────────────────────────────────
+    fn param_count(self) -> int is
+        return LLVMCountParamTypes(self.handle)
+    end
+    fn is_var_arg(self) -> bool is
+        return LLVMIsFunctionVarArg(self.handle) != 0
+    end
+    fn return_type(self) -> Type is
+        return Type { handle: LLVMGetReturnType(self.handle) }
+    end
+    fn param_types(self) -> [Type] is
+        return handles_to_types(obsidian_get_param_types(self.handle))
+    end
+
+    ;; `self` musi być typem zwrotu (np. `ctx.i32_type().fn_type([...], false)`),
+    ;; dokładnie jak `IntType::fn_type` w inkwell.
+    fn fn_type(self, param_types: [Type], is_var_arg: bool) -> Type is
+        return Type { handle: obsidian_function_type(self.handle, types_to_handles(param_types), if is_var_arg then 1 else 0) }
+    end
+
+    ;; ── Struktury ────────────────────────────────────────────────────
+    fn struct_name(self) -> string is
+        return obsidian_struct_name_safe(self.handle)
+    end
+    fn struct_element_count(self) -> int is
+        return LLVMCountStructElementTypes(self.handle)
+    end
+    fn is_packed_struct(self) -> bool is
+        return LLVMIsPackedStruct(self.handle) != 0
+    end
+    fn is_opaque_struct(self) -> bool is
+        return LLVMIsOpaqueStruct(self.handle) != 0
+    end
+    ;; Uzupełnia ciało wcześniej utworzonego `Context::named_struct` —
+    ;; jedyny sposób na struktury samoreferencyjne (np. węzeł listy
+    ;; wiązanej: `struct Node { next: ptr }` gdzie `ptr` wskazuje na sam
+    ;; `Node`).
+    fn set_body(self, field_types: [Type], packed: bool) is
+        obsidian_struct_set_body(self.handle, types_to_handles(field_types), if packed then 1 else 0)
+    end
+
+    ;; ── Rozmiar/wyrównanie jako stałe `i64` (przydatne do `alloca`/GEP
+    ;; ręcznie liczonych rozmiarów; wymagają docelowego layoutu — patrz
+    ;; TargetData w target_machine.h#, jeśli potrzebujesz realnej liczby
+    ;; zamiast symbolicznej stałej LLVM-a). ─────────────────────────────
+    fn size_of(self) -> Value is
+        return Value { handle: LLVMSizeOf(self.handle) }
+    end
+    fn align_of(self) -> Value is
+        return Value { handle: LLVMAlignOf(self.handle) }
+    end
+
+    ;; ── Stałe tego typu ──────────────────────────────────────────────
+    fn const_zero(self) -> Value is
+        return Value { handle: LLVMConstNull(self.handle) }
+    end
+    fn const_all_ones(self) -> Value is
+        return Value { handle: LLVMConstAllOnes(self.handle) }
+    end
+    fn const_undef(self) -> Value is
+        return Value { handle: LLVMGetUndef(self.handle) }
+    end
+    fn const_poison(self) -> Value is
+        return Value { handle: LLVMGetPoison(self.handle) }
+    end
+    ;; Null wskaźnika (`self` musi być `pointer_type`).
+    fn const_null_ptr(self) -> Value is
+        return Value { handle: LLVMConstPointerNull(self.handle) }
+    end
+
+    fn print(self) -> string is
+        return LLVMPrintTypeToString(self.handle)
+    end
+
+    ;; Stała tablica `[N x self]` zbudowana z podanych wartości (`N` =
+    ;; `values.len()`) — `self` musi być typem ELEMENTU (analogicznie do
+    ;; `inkwell`'s `ArrayType::const_array`, tu wołane wprost na typie
+    ;; elementu zamiast na osobnym `ArrayType`).
+    fn const_array(self, values: [Value]) -> Value is
+        return Value { handle: obsidian_const_array(self.handle, values_to_handles(values)) }
+    end
+
+    fn eq(self, other: Type) -> bool is
+        return self.handle == other.handle
+    end
+end
