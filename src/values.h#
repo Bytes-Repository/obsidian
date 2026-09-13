@@ -1,0 +1,97 @@
+mod ffi
+mod conv
+
+struct Value is
+    pub handle: int
+end
+
+impl Value is
+    fn get_type(self) -> Type is
+        return Type { handle: LLVMTypeOf(self.handle) }
+    end
+
+    fn set_name(self, name: string) is
+        LLVMSetValueName2(self.handle, name, string_len(name))
+    end
+    fn get_name(self) -> string is
+        return LLVMGetValueName2(self.handle)
+    end
+
+    fn print(self) -> string is
+        return LLVMPrintValueToString(self.handle)
+    end
+
+    fn is_constant(self) -> bool is return LLVMIsConstant(self.handle) != 0 end
+    fn is_undef(self) -> bool is return LLVMIsUndef(self.handle) != 0 end
+    fn is_poison(self) -> bool is return LLVMIsPoison(self.handle) != 0 end
+    ;; `true` dla zera/null/undef zależnie od typu — odpowiednik
+    ;; `LLVMIsNull` (np. `0`, `0.0`, wskaźnik null, ale NIE dla `undef`).
+    fn is_null(self) -> bool is return LLVMIsNull(self.handle) != 0 end
+
+    ;; Interpretuje stałą całkowitą jako i64 ze znakiem — zachowanie
+    ;; niezdefiniowane (LLVM po prostu obcina bity), jeśli `self` nie jest
+    ;; `LLVMConstInt`.
+    fn const_int_signed(self) -> int is
+        return LLVMConstIntGetSExtValue(self.handle)
+    end
+    fn const_int_unsigned(self) -> int is
+        return LLVMConstIntGetZExtValue(self.handle)
+    end
+    fn const_float_value(self) -> f64 is
+        return LLVMConstRealGetDouble(self.handle, 0)
+    end
+
+    ;; ── Linkage / widoczność (dla globalnych/funkcji) ───────────────────
+    fn set_linkage(self, linkage: i32) is
+        LLVMSetLinkage(self.handle, linkage)
+    end
+    fn get_linkage(self) -> i32 is
+        return LLVMGetLinkage(self.handle)
+    end
+    fn set_visibility(self, vis: i32) is
+        LLVMSetVisibility(self.handle, vis)
+    end
+
+    ;; ── Globalne zmienne (gdy `self` pochodzi z Module::add_global) ────
+    fn set_initializer(self, val: Value) is
+        LLVMSetInitializer(self.handle, val.handle)
+    end
+    fn get_initializer(self) -> Value is
+        return Value { handle: LLVMGetInitializer(self.handle) }
+    end
+    fn set_global_constant(self, is_constant: bool) is
+        LLVMSetGlobalConstant(self.handle, if is_constant then 1 else 0)
+    end
+    fn set_thread_local(self, is_thread_local: bool) is
+        LLVMSetThreadLocal(self.handle, if is_thread_local then 1 else 0)
+    end
+
+    ;; ── Instrukcje: wyrównanie/volatile (dla load/store/alloca) ─────────
+    fn set_alignment(self, align_bytes: int) is
+        LLVMSetAlignment(self.handle, align_bytes)
+    end
+    fn get_alignment(self) -> int is
+        return LLVMGetAlignment(self.handle)
+    end
+    fn set_volatile(self, is_volatile: bool) is
+        LLVMSetVolatile(self.handle, if is_volatile then 1 else 0)
+    end
+
+    fn eq(self, other: Value) -> bool is
+        return self.handle == other.handle
+    end
+
+    ;; Rzutowanie w dół: `nil` jeśli `self` nie jest funkcją/instrukcją/
+    ;; argumentem/blokiem — odpowiednik `inkwell`'s `TryFrom`/`as_*_value`.
+    fn as_function(self) -> FunctionValue? is
+        let h: int = LLVMIsAFunction(self.handle)
+        if h == 0 is return nil end
+        return FunctionValue { handle: self.handle }
+    end
+    fn is_instruction(self) -> bool is
+        return LLVMIsAInstruction(self.handle) != 0
+    end
+    fn is_argument(self) -> bool is
+        return LLVMIsAArgument(self.handle) != 0
+    end
+end
