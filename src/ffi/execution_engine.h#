@@ -1,0 +1,27 @@
+extern dynamic [c, "LLVM-21"] is
+    ;; MCJIT musi być "wlinkowany" (LLVM domyślnie nie linkuje JIT-a, żeby
+    ;; programy niekorzystające z JIT-a nie ciągnęły go za sobą) — wołane
+    ;; raz przez ExecutionEngine::link_in_mcjit().
+    fn LLVMLinkInMCJIT()
+    fn LLVMLinkInInterpreter()
+
+    fn LLVMDisposeExecutionEngine(ee: int)
+    fn LLVMRunStaticConstructors(ee: int)
+    fn LLVMRunStaticDestructors(ee: int)
+    fn LLVMAddModule(ee: int, m: int)
+    fn LLVMRemoveModule(ee: int, m: int, out_mod: int) -> i32
+    fn LLVMFindFunction(ee: int, name: string, out_fn: int) -> i32
+    fn LLVMGetFunctionAddress(ee: int, name: string) -> u64
+    fn LLVMGetExecutionEngineTargetData(ee: int) -> int
+    fn LLVMGetExecutionEngineTargetMachine(ee: int) -> int
+
+    ;; ── GenericValue: argumenty/wyniki dla LLVMRunFunction (interpreter) ──
+    fn LLVMCreateGenericValueOfInt(ty: int, val: u64, is_signed: i32) -> int
+    fn LLVMCreateGenericValueOfFloat(ty: int, val: f64) -> int
+    fn LLVMCreateGenericValueOfPointer(ptr: int) -> int
+    fn LLVMGenericValueToInt(genval: int, is_signed: i32) -> u64
+    fn LLVMGenericValueToFloat(ty: int, genval: int) -> f64
+    fn LLVMGenericValueToPointer(genval: int) -> int
+    fn LLVMGenericValueIntWidth(genval: int) -> u32
+    fn LLVMDisposeGenericValue(genval: int)
+end
