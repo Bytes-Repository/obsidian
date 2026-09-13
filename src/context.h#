@@ -1,0 +1,134 @@
+mod ffi
+mod conv
+
+struct Context is
+    pub handle: int
+end
+
+impl Context is
+    ;; Nowy, niezależny kontekst — normalny wybór dla realnego kompilatora
+    ;; (izolacja między równoległymi jednostkami kompilacji).
+    fn create() -> Context is
+        return Context { handle: LLVMContextCreate() }
+    end
+
+    ;; Globalny, dzielony kontekst LLVM-a. Wygodne w skryptach/REPL-u, ale
+    ;; NIE wołaj `dispose()` na wyniku tej funkcji — jest własnością LLVM-a.
+    fn global() -> Context is
+        return Context { handle: LLVMGetGlobalContext() }
+    end
+
+    ;; Zwalnia kontekst i WSZYSTKO co w nim żyje (typy, stałe...) — wołaj
+    ;; jako ostatnią rzecz, gdy żaden Module/Builder z tego kontekstu nie
+    ;; jest już używany. Nigdy nie wołaj na Context::global().
+    fn dispose(self) is
+        LLVMContextDispose(self.handle)
+    end
+
+    ;; Gdy true (domyślnie false), LLVM nie trzyma czytelnych nazw
+    ;; tymczasowych wartości (`%1` zamiast `%sum`) — trochę szybsza
+    ;; kompilacja, gorszy do czytania `--emit ir`.
+    fn set_discard_value_names(self, discard: bool) is
+        LLVMContextSetDiscardValueNames(self.handle, if discard then 1 else 0)
+    end
+
+    ;; ── Fabryki typów prymitywnych ──────────────────────────────────────
+    fn void_type(self) -> Type is
+        return Type { handle: LLVMVoidTypeInContext(self.handle) }
+    end
+    fn bool_type(self) -> Type is
+        return Type { handle: LLVMInt1TypeInContext(self.handle) }
+    end
+    fn i8_type(self) -> Type is
+        return Type { handle: LLVMInt8TypeInContext(self.handle) }
+    end
+    fn i16_type(self) -> Type is
+        return Type { handle: LLVMInt16TypeInContext(self.handle) }
+    end
+    fn i32_type(self) -> Type is
+        return Type { handle: LLVMInt32TypeInContext(self.handle) }
+    end
+    fn i64_type(self) -> Type is
+        return Type { handle: LLVMInt64TypeInContext(self.handle) }
+    end
+    fn i128_type(self) -> Type is
+        return Type { handle: LLVMInt128TypeInContext(self.handle) }
+    end
+    fn custom_int_type(self, num_bits: int) -> Type is
+        return Type { handle: LLVMIntTypeInContext(self.handle, num_bits) }
+    end
+    fn f32_type(self) -> Type is
+        return Type { handle: LLVMFloatTypeInContext(self.handle) }
+    end
+    fn f64_type(self) -> Type is
+        return Type { handle: LLVMDoubleTypeInContext(self.handle) }
+    end
+    ;; `address_space` prawie zawsze 0 (zwykła pamięć). LLVM >=17 ma
+    ;; wyłącznie *opaque* wskaźniki — nie ma już "wskaźnik na i32" itp.,
+    ;; jeden `ptr` na wszystko (patrz Type::pointer_type).
+    fn pointer_type(self, address_space: int) -> Type is
+        return Type { handle: LLVMPointerTypeInContext(self.handle, address_space) }
+    end
+
+    ;; ── Struktury i tablice/funkcje wymagają shimu (tablica typów) ──────
+    fn struct_type(self, field_types: [Type], packed: bool) -> Type is
+        return Type { handle: obsidian_struct_type_in_context(self.handle, types_to_handles(field_types), if packed then 1 else 0) }
+    end
+
+    ;; Struktura "nazwana" (`%MyStruct = type { ... }` w IR) — utwórz przez
+    ;; `named_struct`, potem uzupełnij pola przez `Type::set_body`
+    ;; (pozwala na typy samoreferencyjne / listy wiązane).
+    fn named_struct(self, name: string) -> Type is
+        return Type { handle: LLVMStructCreateNamed(self.handle, name) }
+    end
+
+    ;; ── Stałe agregatów ──────────────────────────────────────────────
+    fn const_struct(self, values: [Value], packed: bool) -> Value is
+        return Value { handle: obsidian_const_struct_in_context(self.handle, values_to_handles(values), if packed then 1 else 0) }
+    end
+    ;; `struct_ty` = wynik `Context::named_struct` + `Type::set_body`.
+    fn const_named_struct(self, struct_ty: Type, values: [Value]) -> Value is
+        return Value { handle: obsidian_const_named_struct(struct_ty.handle, values_to_handles(values)) }
+    end
+    fn const_vector(self, values: [Value]) -> Value is
+        return Value { handle: obsidian_const_vector(values_to_handles(values)) }
+    end
+
+    ;; ── Moduł ─────────────────────────────────────────────────────────
+    fn create_module(self, name: string) -> Module is
+        return Module { handle: LLVMModuleCreateWithNameInContext(name, self.handle) }
+    end
+
+    ;; ── Builder ───────────────────────────────────────────────────────
+    fn create_builder(self) -> Builder is
+        return Builder { handle: LLVMCreateBuilderInContext(self.handle) }
+    end
+
+    ;; ── Stałe całkowite/zmiennoprzecinkowe ───────────────────────────────
+    fn const_int(self, ty: Type, val: int, sign_extend: bool) -> Value is
+        return Value { handle: LLVMConstInt(ty.handle, val, if sign_extend then 1 else 0) }
+    end
+    fn const_bool(self, val: bool) -> Value is
+        return Value { handle: LLVMConstInt(self.bool_type().handle, if val then 1 else 0, 0) }
+    end
+    fn const_f64(self, ty: Type, val: f64) -> Value is
+        return Value { handle: LLVMConstReal(ty.handle, val) }
+    end
+
+    ;; String literal jako stała `[N x i8]` (BEZ automatycznego
+    ;; wskaźnika/GEP — patrz Builder::build_global_string_ptr, jeśli
+    ;; potrzebujesz od razu `i8*`/`ptr` do np. printf-a).
+    fn const_string(self, s: string, null_terminate: bool) -> Value is
+        return Value { handle: LLVMConstStringInContext2(self.handle, s, string_len(s), if null_terminate then 0 else 1) }
+    end
+
+    ;; Sparsuj tekstowe IR (`.ll`) z powrotem do modułu w tym kontekście —
+    ;; przydatne w testach ("czy to, co wygenerowałem, w ogóle się parsuje
+    ;; z powrotem"). Zwraca `nil` i ustawia `obsidian::last_error()` przy
+    ;; błędzie składni.
+    fn parse_ir(self, ir_text: string) -> Module? is
+        let h: int = obsidian_parse_ir_in_context(self.handle, ir_text)
+        if h == 0 is return nil end
+        return Module { handle: h }
+    end
+end
